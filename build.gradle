@@ -1,0 +1,75 @@
+plugins {
+    id "idea"
+    id "groovy"
+    id "com.energizedwork.webdriver-binaries" version "1.4"
+    id "com.energizedwork.idea-base" version "1.4"
+}
+
+ext {
+    // The drivers we want to use
+    drivers = ["firefox", "chrome", "chromeHeadless", "remoteChrome", "remoteFirefox"]
+
+    ext {
+        gebVersion = '3.0.1'
+        seleniumVersion = '3.14.0'
+        chromeDriverVersion = '77.0.3865.40'
+        geckoDriverVersion = '0.25.0'
+        spockVersion = '1.3-groovy-2.5'
+    }
+}
+
+repositories {
+    mavenCentral()
+    jcenter()
+}
+
+dependencies {
+    testCompile 'com.aoe:geb-spock-reports:0.2.5'
+    testCompile ("com.athaydes:spock-reports:1.6.0") { transitive = false }
+    testCompile 'org.slf4j:slf4j-api:1.7.13'
+    testCompile 'org.slf4j:slf4j-simple:1.7.13'
+
+    testCompile "org.gebish:geb-spock:$gebVersion"
+    testCompile("org.spockframework:spock-core:$spockVersion") {
+        exclude group: "org.codehaus.groovy"
+    }
+    testCompile "org.gebish:geb-junit4:$gebVersion"
+    testCompile "org.seleniumhq.selenium:selenium-chrome-driver:$seleniumVersion"
+    testCompile "org.seleniumhq.selenium:selenium-firefox-driver:$seleniumVersion"
+}
+
+webdriverBinaries {
+    chromedriver chromeDriverVersion
+    geckodriver geckoDriverVersion
+}
+
+drivers.each { driver ->
+    task "${driver}Test"(type: Test) {
+        group JavaBasePlugin.VERIFICATION_GROUP
+
+        outputs.upToDateWhen { false }  // Always run tests
+
+        systemProperty "geb.build.reportsDir", reporting.file("geb/$name")
+        systemProperty "geb.env", driver
+    }
+}
+
+test {
+    dependsOn drivers.collect { tasks["${it}Test"] }
+    enabled = false
+}
+
+tasks.withType(Test) {
+    maxParallelForks = 3 // here three forks shall open in parallel
+    forkEvery = 1
+    include '**/spec/*Spec*.class'
+    maxHeapSize = "1g"
+    jvmArgs '-XX:MaxMetaspaceSize=128m'
+    testLogging {
+        exceptionFormat = 'full'
+    }
+}
+
+tasks.withType(GroovyCompile) {
+    groovyOptions.forkOptions.memoryMaximumSize = '256m'
+}
